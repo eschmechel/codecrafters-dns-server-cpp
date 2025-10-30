@@ -74,7 +74,7 @@ int main() {
 
         // Send response
 
-        if (sendto(udpSocket, dnsMessage.data(), sizeof(dnsMessage.data()), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), sizeof(clientAddress)) == -1) {
+        if (sendto(udpSocket, dnsMessage.data(), dnsMessage.size(), 0, reinterpret_cast<struct sockaddr*>(&clientAddress), sizeof(clientAddress)) == -1) {
             perror("Failed to send response");
         }
     }
@@ -94,7 +94,7 @@ std::vector<uint8_t> createDNSMessage ( uint16_t packetID,
                                     ){
     uint8_t byte1 = static_cast<uint8_t>((packetID & 0xFF00) >> 8);
     uint8_t byte2 = static_cast<uint8_t>((packetID & 0x00FF));
-    uint8_t byte3;
+    uint8_t byte3 = 0;
     //bit 7
     byte3 |= (QRID << 7);
 
@@ -105,7 +105,7 @@ std::vector<uint8_t> createDNSMessage ( uint16_t packetID,
     byte3 |= (TC << 1);
     byte3 |= (RD << 0);
 
-    uint8_t byte4;
+    uint8_t byte4 = 0;
     byte4 |= (RA << 7);
     byte4 |= (Z << 6);
     byte4 |= (AD << 5);
