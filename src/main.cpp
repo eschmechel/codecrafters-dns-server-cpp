@@ -77,7 +77,7 @@ int main() {
 
         // Create an empty response
         char response[1] = { '\0' };
-        std::vector<uint8_t> dnsMessage = createDNSHeader(1234,0,0,0,0,0,0,0,0,0,0,1,0,0,0);
+        std::vector<uint8_t> dnsMessage = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,0,0,0);
 
         // Send response
 
