@@ -209,7 +209,7 @@ std::vector<std::string> split (const std::string &s, char delim) {
     return result;
 }
 
-std::vector<uint8_t> encodeDomainName(const std::string &domainName){
+std::vector<uint8_t> encodeDomainName(const std::string domainName){
     std::vector<std::string> domainSplit = split(domainName, '.');
 
     std::vector<uint8_t>questionBytes = {};
