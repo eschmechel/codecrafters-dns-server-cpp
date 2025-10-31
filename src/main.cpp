@@ -77,7 +77,10 @@ int main() {
 
         // Create an empty response
         char response[1] = { '\0' };
-        std::vector<uint8_t> dnsMessage = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,0,0,0);
+        auto DNSHeader = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,0,0,0);
+        auto DNSQuestion = createDNSQuestion("codecrafters.io",1,1);
+        std::vector<uint8_t> dnsMessage = DNSHeader;
+        dnsMessage.insert(dnsMessage.end(),DNSQuestion.begin(),DNSQuestion.end());
 
         // Send response
 
