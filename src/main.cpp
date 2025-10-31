@@ -7,7 +7,7 @@
 #include <string>
 #include <sstream>
 
-std::vector<uint8_t> createDNSMessage ( uint16_t packetID, 
+std::vector<uint8_t> createDNSHeader ( uint16_t packetID, 
                                         int QRID,int OPCODE,int AA, int TC, int RD,
                                         int RA, int Z, int AD, int CD, int RCODE,
                                         uint16_t numOfQuestions,
@@ -15,6 +15,8 @@ std::vector<uint8_t> createDNSMessage ( uint16_t packetID,
                                         uint16_t numOfAuthorityRRs,
                                         uint16_t numOfAdditionalRRs
                                     );
+
+std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, uint16_t className);
 
 std::vector<std::string> split (const std::string &s, char delim);
 
