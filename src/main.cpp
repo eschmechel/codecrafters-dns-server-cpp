@@ -18,9 +18,9 @@ std::vector<uint8_t> createDNSHeader ( uint16_t packetID,
 
 std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, uint16_t className);
 
-std::vector<uint8_t> createDNSAnswer(std::string &domainName,uint16_t type, uint16_t className, uint32_t TTL, uint16_t RDLENGTH, std::string RDATA);
+std::vector<uint8_t> createDNSAnswer(std::string domainName,uint16_t type, uint16_t className, uint32_t TTL, uint16_t RDLENGTH, std::string RDATA);
 
-std::vector<uint8_t> encodeDomainName(const std::string &domainName);
+std::vector<uint8_t> encodeDomainName(const std::string domainName);
 
 std::vector<std::string> split (const std::string &s, char delim);
 
