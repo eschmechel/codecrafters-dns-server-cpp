@@ -18,6 +18,10 @@ std::vector<uint8_t> createDNSHeader ( uint16_t packetID,
 
 std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, uint16_t className);
 
+std::vector<uint8_t> createDNSAnswer(std::string &domainName,uint16_t type, uint16_t className, uint32_t TTL, uint16_t RDLENGTH, std::string RDATA);
+
+std::vector<uint8_t> encodeDomainName(const std::string &domainName);
+
 std::vector<std::string> split (const std::string &s, char delim);
 
 
@@ -79,8 +83,10 @@ int main() {
         char response[1] = { '\0' };
         auto DNSHeader = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,0,0,0);
         auto DNSQuestion = createDNSQuestion("codecrafters.io",1,1);
+        auto DNSAnswer = createDNSAnswer("codecrafters.io",1,1,60,4,"8.8.8.8");
         std::vector<uint8_t> dnsMessage = DNSHeader;
         dnsMessage.insert(dnsMessage.end(),DNSQuestion.begin(),DNSQuestion.end());
+        dnsMessage.insert(dnsMessage.end(),DNSAnswer.begin(),DNSAnswer.end());
 
         // Send response
 
@@ -140,20 +146,8 @@ std::vector<uint8_t> createDNSHeader ( uint16_t packetID,
 }
 
 std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, uint16_t className){
-    std::vector<std::string> domainSplit = split(domainName, '.');
 
-    std::vector<uint8_t>domainBytes = {};
-    for (size_t i = 0; i < domainSplit.size(); i++){
-        uint8_t domainPartLen = domainSplit[i].size();
-        domainBytes.push_back(domainPartLen);
-
-        for (size_t j = 0; j < domainSplit[i].size(); j++){
-            uint8_t domainSplitPartitionChar = (char)domainSplit[i][j];
-            domainBytes.push_back(domainSplitPartitionChar);
-        }
-    }
-    //Add terminating byte
-    domainBytes.push_back(0x00);
+    std::vector<uint8_t>questionBytes = encodeDomainName(domainName);
 
     uint8_t typeByte1 = static_cast<uint8_t>((type & 0xFF00) >> 8);
     uint8_t typeByte2 = static_cast<uint8_t>((type & 0x00FF));
@@ -162,14 +156,45 @@ std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, ui
     uint8_t classByte2 = static_cast<uint8_t>((className & 0x00FF));
 
     // Append type and class to domain bytes
-    domainBytes.push_back(typeByte1);
-    domainBytes.push_back(typeByte2);
-    domainBytes.push_back(classByte1);
-    domainBytes.push_back(classByte2);
+    questionBytes.push_back(typeByte1);
+    questionBytes.push_back(typeByte2);
+    questionBytes.push_back(classByte1);
+    questionBytes.push_back(classByte2);
 
-    return domainBytes;
+    return questionBytes;
 
 
+}
+
+std::vector<uint8_t> createDNSAnswer(std::string domainName,uint16_t type, uint16_t className, uint32_t TTL, uint16_t RDLENGTH, std::string RDATA){
+    //Domain
+    std::vector<uint8_t> answerBytes = encodeDomainName(domainName);
+
+    //Type
+    answerBytes.push_back(static_cast<uint8_t>((type & 0xFF00) >> 8));
+    answerBytes.push_back(static_cast<uint8_t>((type & 0x00FF)));
+
+    //ClassName
+    answerBytes.push_back(static_cast<uint8_t>((className & 0xFF00) >> 8));
+    answerBytes.push_back(static_cast<uint8_t>((className & 0x00FF)));
+
+    //TTL
+    answerBytes.push_back(static_cast<std::uint8_t>((TTL >> 24) & 0xFF));
+    answerBytes.push_back(static_cast<std::uint8_t>((TTL >> 16) & 0xFF));
+    answerBytes.push_back(static_cast<std::uint8_t>((TTL >>  8) & 0xFF));
+    answerBytes.push_back(static_cast<std::uint8_t>( TTL        & 0xFF));
+
+    //RDLENGTH
+    answerBytes.push_back(static_cast<uint8_t>((RDLENGTH & 0xFF00) >> 8));
+    answerBytes.push_back(static_cast<uint8_t>((RDLENGTH & 0x00FF)));
+
+    //Data
+    std::vector<std::string> splitIP = split(RDATA,'.');
+    for (std::string str: splitIP){
+        uint8_t currentNum = std::stoi(str);
+        answerBytes.push_back(currentNum);
+    }
+    return answerBytes;
 }
 
 std::vector<std::string> split (const std::string &s, char delim) {
@@ -182,4 +207,22 @@ std::vector<std::string> split (const std::string &s, char delim) {
     }
 
     return result;
+}
+
+std::vector<uint8_t> encodeDomainName(const std::string &domainName){
+    std::vector<std::string> domainSplit = split(domainName, '.');
+
+    std::vector<uint8_t>questionBytes = {};
+    for (size_t i = 0; i < domainSplit.size(); i++){
+        uint8_t domainPartLen = domainSplit[i].size();
+        questionBytes.push_back(domainPartLen);
+
+        for (size_t j = 0; j < domainSplit[i].size(); j++){
+            uint8_t domainSplitPartitionChar = (char)domainSplit[i][j];
+            questionBytes.push_back(domainSplitPartitionChar);
+        }
+    }
+    //Add terminating byte
+    questionBytes.push_back(0x00);
+    return questionBytes;
 }
