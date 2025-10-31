@@ -4,6 +4,8 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <vector>
+#include <string>
+#include <sstream>
 
 std::vector<uint8_t> createDNSMessage ( uint16_t packetID, 
                                         int QRID,int OPCODE,int AA, int TC, int RD,
@@ -13,6 +15,9 @@ std::vector<uint8_t> createDNSMessage ( uint16_t packetID,
                                         uint16_t numOfAuthorityRRs,
                                         uint16_t numOfAdditionalRRs
                                     );
+
+std::vector<std::string> split (const std::string &s, char delim);
+
 
 int main() {
     // Flush after every std::cout / std::cerr
@@ -70,7 +75,7 @@ int main() {
 
         // Create an empty response
         char response[1] = { '\0' };
-        std::vector<uint8_t> dnsMessage = createDNSMessage(1234,1,0,0,0,0,0,0,0,0,0,0,0,0,0);
+        std::vector<uint8_t> dnsMessage = createDNSHeader(1234,0,0,0,0,0,0,0,0,0,0,1,0,0,0);
 
         // Send response
 
@@ -84,7 +89,8 @@ int main() {
     return 0;
 }
 
-std::vector<uint8_t> createDNSMessage ( uint16_t packetID, 
+//Create DNS Header
+std::vector<uint8_t> createDNSHeader ( uint16_t packetID, 
                                         int QRID,int OPCODE,int AA, int TC, int RD,
                                         int RA, int Z, int AD, int CD, int RCODE,
                                         uint16_t numOfQuestions,
@@ -126,4 +132,43 @@ std::vector<uint8_t> createDNSMessage ( uint16_t packetID,
 
     return std::vector<uint8_t>{byte1,byte2,byte3,byte4,byte5,byte6,byte7,byte8,byte9,byte10,byte11,byte12};
 
+}
+
+std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, uint16_t className){
+    std::vector<std::string> domainSplit = split(domainName, '.');
+
+    std::vector<uint8_t>domainBytes = {};
+    for (size_t i = 0; i < domainSplit.size(); i++){
+        uint8_t domainPartLen = domainSplit[i].size();
+        domainBytes.push_back(domainPartLen);
+
+        for (size_t j = 0; j < domainSplit[i].size(); j++){
+            uint8_t domainSplitPartitionChar = domainSplit[i][j];
+            domainBytes.push_back(domainSplitPartitionChar);
+        }
+    }
+    //Add terminating byte
+    domainBytes.push_back(0x00);
+
+    uint8_t typeByte1 = static_cast<uint8_t>((type & 0xFF00) >> 8);
+    uint8_t typeByte2 = static_cast<uint8_t>((type & 0x00FF));
+
+    uint8_t classByte1 = static_cast<uint8_t>((className & 0xFF00) >> 8);
+    uint8_t classByte2 = static_cast<uint8_t>((className & 0x00FF));
+
+    return std::vector<uint8_t>{typeByte1,typeByte2,classByte1,classByte2};
+
+
+}
+
+std::vector<std::string> split (const std::string &s, char delim) {
+    std::vector<std::string> result;
+    std::stringstream ss (s);
+    std::string item;
+
+    while (getline (ss, item, delim)) {
+        result.push_back (item);
+    }
+
+    return result;
 }
