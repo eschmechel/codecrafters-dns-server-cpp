@@ -81,7 +81,7 @@ int main() {
 
         // Create an empty response
         char response[1] = { '\0' };
-        auto DNSHeader = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,0,0,0);
+        auto DNSHeader = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,1,0,0);
         auto DNSQuestion = createDNSQuestion("codecrafters.io",1,1);
         auto DNSAnswer = createDNSAnswer("codecrafters.io",1,1,60,4,"8.8.8.8");
         std::vector<uint8_t> dnsMessage = DNSHeader;
