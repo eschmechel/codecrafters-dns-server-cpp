@@ -161,7 +161,13 @@ std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, ui
     uint8_t classByte1 = static_cast<uint8_t>((className & 0xFF00) >> 8);
     uint8_t classByte2 = static_cast<uint8_t>((className & 0x00FF));
 
-    return std::vector<uint8_t>{typeByte1,typeByte2,classByte1,classByte2};
+    // Append type and class to domain bytes
+    domainBytes.push_back(typeByte1);
+    domainBytes.push_back(typeByte2);
+    domainBytes.push_back(classByte1);
+    domainBytes.push_back(classByte2);
+
+    return domainBytes;
 
 
 }
