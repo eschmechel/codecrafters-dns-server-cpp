@@ -148,7 +148,7 @@ std::vector<uint8_t> createDNSQuestion(std::string domainName, uint16_t type, ui
         domainBytes.push_back(domainPartLen);
 
         for (size_t j = 0; j < domainSplit[i].size(); j++){
-            uint8_t domainSplitPartitionChar = domainSplit[i][j];
+            uint8_t domainSplitPartitionChar = (char)domainSplit[i][j];
             domainBytes.push_back(domainSplitPartitionChar);
         }
     }
