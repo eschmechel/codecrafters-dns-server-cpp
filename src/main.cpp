@@ -24,6 +24,9 @@ std::vector<uint8_t> encodeDomainName(const std::string domainName);
 
 std::vector<std::string> split (const std::string &s, char delim);
 
+void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,int &AA, int &TC, int &RD, int &RA, int &Z, int &AD, int &CD, int &RCODE,
+                                        uint16_t &numOfQuestions, uint16_t &numOfAnswers, uint16_t &numOfAuthorityRRs, uint16_t &numOfAdditionalRRs);
+
 
 int main() {
     // Flush after every std::cout / std::cerr
@@ -78,10 +81,14 @@ int main() {
 
         buffer[bytesRead] = '\0';
         std::cout << "Received " << bytesRead << " bytes: " << buffer << std::endl;
+        std::uint16_t packetID, numOfQuestions, numOfAnswers, numOfAuthorityRRs, numOfAdditionalRRs; 
+        int QRID, OPCODE, AA, TC, RD, RA, Z, AD, CD, RCODE; 
+        const char* bufPtr = buffer;
+        parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
 
         // Create an empty response
         char response[1] = { '\0' };
-        auto DNSHeader = createDNSHeader(1234,1,0,0,0,0,0,0,0,0,0,1,1,0,0);
+        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,0,1,1,0,0);
         auto DNSQuestion = createDNSQuestion("codecrafters.io",1,1);
         auto DNSAnswer = createDNSAnswer("codecrafters.io",1,1,60,4,"8.8.8.8");
         std::vector<uint8_t> dnsMessage = DNSHeader;
@@ -225,4 +232,31 @@ std::vector<uint8_t> encodeDomainName(const std::string domainName){
     //Add terminating byte
     questionBytes.push_back(0x00);
     return questionBytes;
+}
+
+void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,int &AA, int &TC, int &RD, int &RA, int &Z, int &AD, int &CD, int &RCODE,
+                                        uint16_t &numOfQuestions, uint16_t &numOfAnswers, uint16_t &numOfAuthorityRRs, uint16_t &numOfAdditionalRRs){
+    std::vector<std::uint8_t> header;
+    for (int i = 0; i < 12; i++){
+        header.push_back(static_cast<std::uint8_t>(*(buffer++)));
+    }
+
+    packetID = ((std::uint16_t)header[0] << 8) | header[1];
+    //Isolate individual bits
+    QRID=   (header[2] >> 7 ) & 1;//bit 1
+    OPCODE= (header[2] >>3) &0x0F;//bit2,3,4,5,
+    AA=     (header[2] >> 2) & 1;
+    TC=     (header[2] >> 1) & 1;
+    RD=     (header[2] >> 0) & 1;
+
+    RA=     (header[3] >> 7 ) & 1;
+    Z=      (header[3] >> 6 ) & 1;
+    AD=     (header[3] >> 5 ) & 1;
+    CD=     (header[3] >> 4 ) & 1;
+    RCODE=  (header[3] >> 0) &0x0F;
+
+    numOfQuestions =        ((std::uint16_t)header[4] << 8) | header[5];
+    numOfAnswers =          ((std::uint16_t)header[6] << 8) | header[7];
+    numOfAuthorityRRs =     ((std::uint16_t)header[8] << 8) | header[9];
+    numOfAdditionalRRs =    ((std::uint16_t)header[10] << 8) | header[11];
 }
