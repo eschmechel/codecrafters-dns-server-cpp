@@ -89,19 +89,27 @@ int main() {
         int QRID, OPCODE, AA, TC, RD, RA, Z, AD, CD, RCODE; 
         const char* bufPtr = buffer;
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
+        
+        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,numOfQuestions,numOfAnswers,0,0);
+
 
         std::string domainName;
         uint16_t className,typeName;
-        parseQuestion(bufPtr,domainName,typeName,className);
+        std::vector<uint8_t> DNSQuestions;
+        std::vector<uint8_t> DNSAnswers;
+        for (int16_t i = 0; i < numOfQuestions; i++){
+            parseQuestion(bufPtr,domainName,typeName,className);
 
-        // Create an empty response
-        char response[1] = { '\0' };
-        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,1,1,0,0);
-        auto DNSQuestion = createDNSQuestion(domainName,typeName,className);
-        auto DNSAnswer = createDNSAnswer(domainName,typeName,className,60,4,"8.8.8.8");
+            auto currentQuestion = createDNSQuestion(domainName,typeName,className);
+            DNSQuestions.insert(DNSQuestions.end(),currentQuestion.begin(),currentQuestion.end());
+
+            auto currentAnswer = createDNSAnswer(domainName,typeName,className,60,4,"8.8.8.8");
+            DNSAnswers.insert(DNSAnswers.end(),currentAnswer.begin(),currentAnswer.end());
+        }
+
         std::vector<uint8_t> dnsMessage = DNSHeader;
-        dnsMessage.insert(dnsMessage.end(),DNSQuestion.begin(),DNSQuestion.end());
-        dnsMessage.insert(dnsMessage.end(),DNSAnswer.begin(),DNSAnswer.end());
+        dnsMessage.insert(dnsMessage.end(),DNSQuestions.begin(),DNSQuestions.end());//Add Questions
+        dnsMessage.insert(dnsMessage.end(),DNSAnswers.begin(),DNSAnswers.end());//Add Answers
 
         // Send response
 
