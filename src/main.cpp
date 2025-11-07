@@ -282,8 +282,8 @@ void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t typeByte
     }
     buffer++;//Get beyond null byte
 
-    typeByte = ((std::uint16_t)buffer << 8) | (std::uint8_t)(++buffer);
+    typeByte = ((std::uint16_t)*buffer << 8) | (std::uint8_t)*(++buffer);
 
-    classByte = ((std::uint16_t)++buffer << 8) | (std::uint8_t)(++buffer);
+    classByte = ((std::uint16_t)*(++buffer) << 8) | (std::uint8_t)*(++buffer);
 
 }
