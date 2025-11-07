@@ -93,14 +93,15 @@ int main() {
         const char* originalBuffer = buffer; // Keep track of the original buffer for compression pointer resolution
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
         
-        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,numOfQuestions,numOfAnswers,0,0);
+        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,RCODE,numOfQuestions,numOfQuestions,0,0);
 
 
-        std::string domainName;
+        std::string domainName = "";
         uint16_t className,typeName;
         std::vector<uint8_t> DNSQuestions;
         std::vector<uint8_t> DNSAnswers;
         for (int16_t i = 0; i < numOfQuestions; i++){
+            domainName.clear(); // Clear domain name for each question
             parseQuestion(bufPtr,originalBuffer,domainName,typeName,className);
 
             auto currentQuestion = createDNSQuestion(domainName,typeName,className);
