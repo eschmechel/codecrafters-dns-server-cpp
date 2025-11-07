@@ -28,7 +28,9 @@ std::vector<std::string> split (const std::string &s, char delim);
 void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,int &AA, int &TC, int &RD, int &RA, int &Z, int &AD, int &CD, int &RCODE,
                                         uint16_t &numOfQuestions, uint16_t &numOfAnswers, uint16_t &numOfAuthorityRRs, uint16_t &numOfAdditionalRRs);
 
-void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t &typeByte, uint16_t &classByte);
+void parseQuestion(const char* &buffer, const char* originalBuffer, std::string &DomainName,uint16_t &typeByte, uint16_t &classByte);
+
+std::string decodeDomainName(const char* &buffer, const char* originalBuffer);
 
 
 int main() {
@@ -88,6 +90,7 @@ int main() {
         std::uint16_t packetID, numOfQuestions, numOfAnswers, numOfAuthorityRRs, numOfAdditionalRRs; 
         int QRID, OPCODE, AA, TC, RD, RA, Z, AD, CD, RCODE; 
         const char* bufPtr = buffer;
+        const char* originalBuffer = buffer; // Keep track of the original buffer for compression pointer resolution
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
         
         auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,numOfQuestions,numOfAnswers,0,0);
@@ -98,7 +101,7 @@ int main() {
         std::vector<uint8_t> DNSQuestions;
         std::vector<uint8_t> DNSAnswers;
         for (int16_t i = 0; i < numOfQuestions; i++){
-            parseQuestion(bufPtr,domainName,typeName,className);
+            parseQuestion(bufPtr,originalBuffer,domainName,typeName,className);
 
             auto currentQuestion = createDNSQuestion(domainName,typeName,className);
             DNSQuestions.insert(DNSQuestions.end(),currentQuestion.begin(),currentQuestion.end());
@@ -277,29 +280,69 @@ void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,
     numOfAdditionalRRs =    ((std::uint16_t)header[10] << 8) | header[11];
 }
 
-void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t &typeByte, uint16_t &classByte){
+std::string decodeDomainName(const char* &buffer, const char* originalBuffer) {
+    std::string domainName;
+    bool firstLabel = true;
+    bool jumped = false;
+    const char* jumpBackTo = nullptr;
+    int maxJumps = 5; // Prevent infinite loops
+    int jumps = 0;
 
-    bool firstByte = true;
-    while (*buffer!= 0){
+    while (true) {
+        // Check if we've followed too many pointers
+        if (jumps > maxJumps) {
+            break;
+        }
 
         uint8_t length = static_cast<uint8_t>(*buffer);
-        buffer++;
-        if (length == 0)
+        
+        // Check for null terminator
+        if (length == 0) {
+            buffer++;
             break;
-
-        if (!firstByte){
-            DomainName += ".";
         }
-        firstByte = false;
-
-        for (uint8_t i = 0; i < length; i++){
-            DomainName += *(buffer++);
+        
+        // Check for compression pointer (top 2 bits are 11)
+        if ((length & 0xC0) == 0xC0) {
+            // This is a pointer
+            if (!jumped) {
+                jumpBackTo = buffer + 2; // Save position to return to after following pointer
+                jumped = true;
+            }
+            
+            // Get the offset (14 bits)
+            uint16_t offset = ((static_cast<uint16_t>(length) & 0x3F) << 8) | static_cast<uint8_t>(*(buffer + 1));
+            buffer = originalBuffer + offset;
+            jumps++;
+            continue;
+        }
+        
+        // Regular label
+        buffer++;
+        
+        if (!firstLabel) {
+            domainName += ".";
+        }
+        firstLabel = false;
+        
+        for (uint8_t i = 0; i < length; i++) {
+            domainName += *(buffer++);
         }
     }
-    buffer++;//Get beyond null byte
+    
+    // If we jumped, restore the buffer position to after the pointer
+    if (jumped && jumpBackTo != nullptr) {
+        buffer = jumpBackTo;
+    }
+    
+    return domainName;
+}
+
+void parseQuestion(const char* &buffer, const char* originalBuffer, std::string &DomainName,uint16_t &typeByte, uint16_t &classByte){
+    DomainName = decodeDomainName(buffer, originalBuffer);
 
     typeByte = ((std::uint16_t)*buffer << 8) | (std::uint8_t)*(++buffer);
 
     classByte = ((std::uint16_t)*(++buffer) << 8) | (std::uint8_t)*(++buffer);
-
+    buffer++; // Move to next position
 }
