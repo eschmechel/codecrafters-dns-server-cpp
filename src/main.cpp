@@ -269,16 +269,24 @@ void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,
     numOfAdditionalRRs =    ((std::uint16_t)header[10] << 8) | header[11];
 }
 
-void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t typeByte, uint16_t &classByte){
+void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t &typeByte, uint16_t &classByte){
 
-    buffer+=11;//Get beyond header
-    while (buffer!= nullptr){
-        if (!isdigit(*buffer)){
-            DomainName+= *buffer;
-        }else{
+    bool firstByte = true;
+    while (*buffer!= NULL){
+
+        uint8_t length = static_cast<uint8_t>(*buffer);
+        buffer++;
+        if (length == 0)
+            break;
+
+        if (!firstByte){
             DomainName += ".";
         }
-        buffer++;
+        firstByte = false;
+
+        for (uint8_t i = 0; i < length; i++){
+            DomainName += *(buffer++);
+        }
     }
     buffer++;//Get beyond null byte
 
