@@ -272,7 +272,7 @@ void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,
 void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t &typeByte, uint16_t &classByte){
 
     bool firstByte = true;
-    while (*buffer!= NULL){
+    while (*buffer!= 0){
 
         uint8_t length = static_cast<uint8_t>(*buffer);
         buffer++;
