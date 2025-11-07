@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <ctype.h>
 
 std::vector<uint8_t> createDNSHeader ( uint16_t packetID, 
                                         int QRID,int OPCODE,int AA, int TC, int RD,
@@ -26,6 +27,8 @@ std::vector<std::string> split (const std::string &s, char delim);
 
 void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,int &AA, int &TC, int &RD, int &RA, int &Z, int &AD, int &CD, int &RCODE,
                                         uint16_t &numOfQuestions, uint16_t &numOfAnswers, uint16_t &numOfAuthorityRRs, uint16_t &numOfAdditionalRRs);
+
+void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t typeByte, uint16_t &classByte);
 
 
 int main() {
@@ -81,16 +84,21 @@ int main() {
 
         buffer[bytesRead] = '\0';
         std::cout << "Received " << bytesRead << " bytes: " << buffer << std::endl;
+
         std::uint16_t packetID, numOfQuestions, numOfAnswers, numOfAuthorityRRs, numOfAdditionalRRs; 
         int QRID, OPCODE, AA, TC, RD, RA, Z, AD, CD, RCODE; 
         const char* bufPtr = buffer;
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
 
+        std::string domainName;
+        uint16_t className,typeName;
+        parseQuestion(bufPtr,domainName,typeName,className);
+
         // Create an empty response
         char response[1] = { '\0' };
         auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,1,1,0,0);
-        auto DNSQuestion = createDNSQuestion("codecrafters.io",1,1);
-        auto DNSAnswer = createDNSAnswer("codecrafters.io",1,1,60,4,"8.8.8.8");
+        auto DNSQuestion = createDNSQuestion(domainName,typeName,className);
+        auto DNSAnswer = createDNSAnswer(domainName,typeName,className,60,4,"8.8.8.8");
         std::vector<uint8_t> dnsMessage = DNSHeader;
         dnsMessage.insert(dnsMessage.end(),DNSQuestion.begin(),DNSQuestion.end());
         dnsMessage.insert(dnsMessage.end(),DNSAnswer.begin(),DNSAnswer.end());
@@ -259,4 +267,23 @@ void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,
     numOfAnswers =          ((std::uint16_t)header[6] << 8) | header[7];
     numOfAuthorityRRs =     ((std::uint16_t)header[8] << 8) | header[9];
     numOfAdditionalRRs =    ((std::uint16_t)header[10] << 8) | header[11];
+}
+
+void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t typeByte, uint16_t &classByte){
+
+    buffer+=11;//Get beyond header
+    while (buffer!= nullptr){
+        if (!isdigit(*buffer)){
+            DomainName+= *buffer;
+        }else{
+            DomainName += ".";
+        }
+        buffer++;
+    }
+    buffer++;//Get beyond null byte
+
+    typeByte = ((std::uint16_t)buffer << 8) | (std::uint8_t)(++buffer);
+
+    classByte = ((std::uint16_t)++buffer << 8) | (std::uint8_t)(++buffer);
+
 }
