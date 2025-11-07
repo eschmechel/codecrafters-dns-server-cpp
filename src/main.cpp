@@ -28,7 +28,7 @@ std::vector<std::string> split (const std::string &s, char delim);
 void parseHeader(const char* &buffer, uint16_t &packetID, int &QRID,int &OPCODE,int &AA, int &TC, int &RD, int &RA, int &Z, int &AD, int &CD, int &RCODE,
                                         uint16_t &numOfQuestions, uint16_t &numOfAnswers, uint16_t &numOfAuthorityRRs, uint16_t &numOfAdditionalRRs);
 
-void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t typeByte, uint16_t &classByte);
+void parseQuestion(const char* &buffer,std::string &DomainName,uint16_t &typeByte, uint16_t &classByte);
 
 
 int main() {
