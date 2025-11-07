@@ -93,7 +93,7 @@ int main() {
         const char* originalBuffer = buffer; // Keep track of the original buffer for compression pointer resolution
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
         
-        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,RCODE,numOfQuestions,numOfQuestions,0,0);
+        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,numOfQuestions,numOfQuestions,0,0);
 
 
         std::string domainName = "";
