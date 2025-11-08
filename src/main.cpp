@@ -2,6 +2,7 @@
 #include <cstring>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <vector>
 #include <string>
@@ -33,7 +34,28 @@ void parseQuestion(const char* &buffer, const char* originalBuffer, std::string 
 std::string decodeDomainName(const char* &buffer, const char* originalBuffer);
 
 
-int main() {
+int main(int argc, char* argv[]) {
+    
+    // Resolver configuration
+    bool useResolver = false;
+    sockaddr_in resolverAddr = {};
+    
+    if (argc >= 3 && std::strcmp(argv[1], "--resolver") == 0){
+        useResolver = true;
+        std::string address = argv[2];
+        size_t colonPos = address.find(':');
+        if (colonPos != std::string::npos) {
+            std::string ipStr = address.substr(0, colonPos);
+            std::string portStr = address.substr(colonPos + 1);
+            resolverAddr.sin_family = AF_INET;
+            resolverAddr.sin_addr.s_addr = inet_addr(ipStr.c_str());
+            resolverAddr.sin_port = htons(std::stoi(portStr));
+        }
+    }
+
+    in_addr_t ip = INADDR_ANY;
+    uint16_t port = htons(2053);
+    
     // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
@@ -63,8 +85,8 @@ int main() {
 
     sockaddr_in serv_addr = { 
                             .sin_family = AF_INET,
-                            .sin_port = htons(2053),
-                            .sin_addr = { htonl(INADDR_ANY) },
+                            .sin_port = port,
+                            .sin_addr = { ip },
                             };
 
     if (bind(udpSocket, reinterpret_cast<struct sockaddr*>(&serv_addr), sizeof(serv_addr)) != 0) {
@@ -93,24 +115,93 @@ int main() {
         const char* originalBuffer = buffer; // Keep track of the original buffer for compression pointer resolution
         parseHeader(bufPtr,packetID,QRID,OPCODE, AA,TC,RD,RA,Z,AD,CD,RCODE,numOfQuestions,numOfAnswers,numOfAuthorityRRs,numOfAdditionalRRs);
         
-        auto DNSHeader = createDNSHeader(packetID,1,OPCODE,0,0,RD,0,0,0,0,4,numOfQuestions,numOfQuestions,0,0);
-
-
-        std::string domainName = "";
-        uint16_t className,typeName;
+        // Parse all questions first
+        std::vector<std::tuple<std::string, uint16_t, uint16_t>> questions; // domain, type, class
         std::vector<uint8_t> DNSQuestions;
-        std::vector<uint8_t> DNSAnswers;
+        
         for (int16_t i = 0; i < numOfQuestions; i++){
-            domainName.clear(); // Clear domain name for each question
-            parseQuestion(bufPtr,originalBuffer,domainName,typeName,className);
-
-            auto currentQuestion = createDNSQuestion(domainName,typeName,className);
-            DNSQuestions.insert(DNSQuestions.end(),currentQuestion.begin(),currentQuestion.end());
-
-            auto currentAnswer = createDNSAnswer(domainName,typeName,className,60,4,"8.8.8.8");
-            DNSAnswers.insert(DNSAnswers.end(),currentAnswer.begin(),currentAnswer.end());
+            std::string domainName;
+            uint16_t className, typeName;
+            parseQuestion(bufPtr, originalBuffer, domainName, typeName, className);
+            questions.push_back(std::make_tuple(domainName, typeName, className));
+            
+            auto currentQuestion = createDNSQuestion(domainName, typeName, className);
+            DNSQuestions.insert(DNSQuestions.end(), currentQuestion.begin(), currentQuestion.end());
         }
 
+        std::vector<uint8_t> DNSAnswers;
+        
+        if (useResolver) {
+
+            for (size_t i = 0; i < questions.size(); i++) {
+                std::string domainName = std::get<0>(questions[i]);
+                uint16_t typeName = std::get<1>(questions[i]);
+                uint16_t className = std::get<2>(questions[i]);
+                
+                // CDNS packet with single question
+                auto singleQuestionHeader = createDNSHeader(packetID + i, 0, OPCODE, 0, 0, RD, 0, 0, 0, 0, 0, 1, 0, 0, 0);
+                auto singleQuestion = createDNSQuestion(domainName, typeName, className);
+                
+                std::vector<uint8_t> forwardPacket = singleQuestionHeader;
+                forwardPacket.insert(forwardPacket.end(), singleQuestion.begin(), singleQuestion.end());
+                
+                // Send to resolver
+                if (sendto(udpSocket, forwardPacket.data(), forwardPacket.size(), 0, 
+                          reinterpret_cast<struct sockaddr*>(&resolverAddr), sizeof(resolverAddr)) == -1) {
+                    perror("Failed to forward to resolver");
+                    continue;
+                }
+                
+                // Receive response from resolver
+                char resolverBuffer[512];
+                sockaddr_in resolverResponse;
+                socklen_t resolverResponseLen = sizeof(resolverResponse);
+                int resolverBytesRead = recvfrom(udpSocket, resolverBuffer, sizeof(resolverBuffer), 0,
+                                                 reinterpret_cast<struct sockaddr*>(&resolverResponse), &resolverResponseLen);
+                
+                if (resolverBytesRead > 0) {
+                    // Parse the response to extract answers
+                    const char* respPtr = resolverBuffer;
+                    const char* respOriginal = resolverBuffer;
+                    std::uint16_t respPacketID, respNumQ, respNumA, respNumAuth, respNumAdd;
+                    int respQRID, respOPCODE, respAA, respTC, respRD, respRA, respZ, respAD, respCD, respRCODE;
+                    
+                    parseHeader(respPtr, respPacketID, respQRID, respOPCODE, respAA, respTC, respRD, 
+                               respRA, respZ, respAD, respCD, respRCODE, respNumQ, respNumA, respNumAuth, respNumAdd);
+                    
+                    // Skip question section in response
+                    for (uint16_t q = 0; q < respNumQ; q++) {
+                        std::string dummyDomain;
+                        uint16_t dummyType, dummyClass;
+                        parseQuestion(respPtr, respOriginal, dummyDomain, dummyType, dummyClass);
+                    }
+                    
+                    // Extract answer section - copy raw bytes from current position to end
+                    int answerSectionStart = respPtr - respOriginal;
+                    int answerSectionLength = resolverBytesRead - answerSectionStart;
+                    
+                    if (answerSectionLength > 0) {
+                        DNSAnswers.insert(DNSAnswers.end(), 
+                                        resolverBuffer + answerSectionStart, 
+                                        resolverBuffer + resolverBytesRead);
+                    }
+                }
+            }
+        } else {
+            // original behavior dummy answers
+            for (size_t i = 0; i < questions.size(); i++) {
+                std::string domainName = std::get<0>(questions[i]);
+                uint16_t typeName = std::get<1>(questions[i]);
+                uint16_t className = std::get<2>(questions[i]);
+                
+                auto currentAnswer = createDNSAnswer(domainName, typeName, className, 60, 4, "8.8.8.8");
+                DNSAnswers.insert(DNSAnswers.end(), currentAnswer.begin(), currentAnswer.end());
+            }
+        }
+        
+        // Create final response header
+        auto DNSHeader = createDNSHeader(packetID, 1, OPCODE, 0, 0, RD, 0, 0, 0, 0, 4, numOfQuestions, numOfQuestions, 0, 0);
+        
         std::vector<uint8_t> dnsMessage = DNSHeader;
         dnsMessage.insert(dnsMessage.end(),DNSQuestions.begin(),DNSQuestions.end());//Add Questions
         dnsMessage.insert(dnsMessage.end(),DNSAnswers.begin(),DNSAnswers.end());//Add Answers
